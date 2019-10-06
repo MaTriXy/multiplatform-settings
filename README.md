@@ -1,69 +1,40 @@
 # Multiplatform Settings
 
-This is a Kotlin library for Multiplatform mobile apps, so that common code can persist key-value data. It stores things using SharedPreferences on Android and UserDefaults on iOS. 
+This is a Kotlin library for Multiplatform apps, so that common code can persist key-value data. It stores things using SharedPreferences on Android and NSUserDefaults on iOS. 
 
 ## Adding to your project
-First, add the multiplatform-settings bintray url to the `repositories` block of any module using it.
+Multiplatform Settings is currently published to jcenter, so add that to repositories.
 
     repositories {
         ...
-        maven { url = 'https://dl.bintray.com/russhwolf/multiplatform-settings' }
+        jcenter()
     }
 
-In your `kotlin-platform-common` module, add the dependency
+Then, simply add the dependency to your common source-set dependencies
 
-    implementation "com.russhwolf:multiplatform-settings-common:0.1-alpha3"
-    
-In your `kotlin-platform-android` module, add an `expectedBy` dependency on the common module as well as the dependency
-
-    implementation "com.russhwolf:multiplatform-settings-android:0.1-alpha3"
-    
-In your `konan` module, add an `expectedBy` dependency on the common module as well as separate artifacts for the targets `ios_arm64` (physical device) and `ios_x64` (emulator). The syntax here is not particularly well-documented, but here's an example to illustrate. Assume you want to expose a framework named `MyKotlinFramework` to your ios project.
-
-    konanArtifacts {
-        framework('MyKotlinFramework_ios_arm64', targets: ['ios_arm64']) {
-            enableMultiplatform true
-            artifactName 'MyKotlinFramework'
-            dependencies {
-                artifactMyKotlinFramework_ios_arm64 "com.russhwolf:multiplatform-settings-ios_arm64:0.1-alpha3"
-            }
-        }
-        framework('MyKotlinFramework_ios_x64', targets: ['ios_x64']) {
-            enableMultiplatform true
-            artifactName 'MyKotlinFramework'
-            dependencies {
-                artifactMyKotlinFramework_ios_x64 "com.russhwolf:multiplatform-settings-ios_x64:0.1-alpha3"
-            }
+    commonMain {
+        dependencies {
+            ...
+            implementation "com.russhwolf:multiplatform-settings:0.4"
         }
     }
-
+    
 See also the sample project, which uses this structure.
 
 ## Usage
 
-The `Settings` interface is implemented by the `PlatformSettings` class, which has separate implementations for Android and iOS. A `PlatformSettings` instance can be created using a platform-specific factory. On Android, this factory needs a `Context` parameter
+The `Settings` interface has implementations on the Android, iOS (arm64, arm32, and x64), macOS (x64), JVM, and JS platforms. (Note that the JVM and JS implementations are currently marked as experimental.)
 
-    val context: Context = ...
-    val factory: Settings.Factory = PlatformSettings.Factory(context)
-    val settings: Settings = factory.create("my_settings_name")
-    
-On iOS, the factory can be instantiated without passing any parameter
-
-    val factory: Settings.Factory = PlatformSettings.Factory()
-    val settings = factory.create("my_settings_name")
-    
-On both platforms, the name argument to `Factory.create()` can be omitted, and a platform-specific default will be used.
-
-Alternatively, you can create a `PlatformSettings` instance by passing the platform-specific delegate class that `PlatformSettings` wraps around. On Android, 
+The Android implementation is `AndroidSettings`, which wraps `SharedPreferences`.
 
     val delegate: SharedPreferences = ...
-    val settings: Settings = PlatformSettings(delegate)
-    
-And on iOS,
+    val settings: Settings = AndroidSettings(delegate)
+
+On iOS or macOS, `AppleSettings` wraps `NSUserDefaults`.
 
     val delegate: NSUserDefaults = ...
-    val settings: Settings = PlatformSettings(delegate)    
-    
+    val settings: Settings = AppleSettings(delegate)
+        
 Once the `Settings` instance is created, you can store values by calling the various `putXXX()` methods, or their operator shortcuts
 
     settings.putInt("key", 3)
@@ -75,12 +46,23 @@ You can retrieve stored values via the `getXXX()` methods or their operator shor
     val b: Int = settings.getInt("key", defaultValue = -1) 
     val c: Int = settings["key", -1]
     
+Nullable methods are also available to avoid the need to use a default value. Instead, `null` will be returned if a key is not present.
+
+    val a: Int? = settings.getIntOrNull("key")
+    val b: Int? = settings["key"]
+    
 The `getXXX()` and `putXXX()` operation for a given key can be wrapped using a property delegate. This has the advantage of ensuring that the key is always accessed with a consistent type.
 
     val a: Int by settings.int("key")
     val b: Int by settings.int("key", defaultValue = -1)
     
-    val c: Int? by settings.nullableInt("another_key")
+Nullable delegates exists so that absence of a key can be indicated by `null` instead of a default value
+    
+    val a: Int? by settings.nullableInt("key")
+    
+The `key` parameter can be omitted for delegates, and the property name will be reflectively used instead.
+
+    val a: Int by settings.int() // internally, key is "a"
     
 Existence of a key can be queried
      
@@ -90,24 +72,77 @@ Existence of a key can be queried
  Values can also be removed by key
   
     settings.remove("key")
-    settings -= "key"  
+    settings -= "key"
+    settings["key"] = null
   
  Finally, all values in a `Settings` instance can be removed
       
     settings.clear()
 
+For the Android, iOS, and macOS platforms, a `Factory` class also exists, so that multiple named `Settings` instances can coexist with the names being controlled from common code.
+
+On Android, this factory needs a `Context` parameter
+
+    val context: Context = ...
+    val factory: Settings.Factory = AndroidSettings.Factory(context)
+    
+On iOS and macOS, the factory can be instantiated without passing any parameter
+
+    val factory: Settings.Factory = AppleSettings.Factory()
+    
+## Testing
+
+A testing dependency is available to aid in testing code that interacts with this library.
+
+    implementation "com.russhwolf:multiplatform-settings-test:0.4"
+    
+This includes a `MockSettings` implementation of the `Settings` interface, which is backed by an in-memory `MutableMap` on all platforms.
+    
+## Experimental API
+
+### Experimental Platforms
+
+Two pure-JVM implementations exist. `JvmPreferencesSettings` wraps `Preferences` and `JvmPropertiesSettings` wraps `Properties`. Their experimental status is marked with the `@ExperimentalJvm` annotation. 
+
+    val delegate: Preferences = ...
+    val settings: Settings = JvmPreferencesSettings(delegate)
+
+    val delegate: Properties = ...
+    val settings: Settings = JvmPropertiesSettings(delegate)
+    
+A JS implementation exists which wraps the `Storage` API. Its experimental status is marked with the `@ExperimentalJvm` annotation
+
+    val delegate: Storage = ...
+    val settings: Settings = JsSettings(delegate)
+    
+    val settings: Settings = JsSettings() // use localStorage by default
+    
+### Listeners
+
+Update listeners are available using an experimental API, only for the `AndroidSettings`, `AppleSettings`, and `JvmPreferencesSettings` implementations. These are marked with the `ObservableSettings` interface, which includes `addListener()` and `removeListener()` methods.
+
+    val settingsListener: SettingsListener = settings.addListener(key) { ... }
+    
+The `SettingsListener` returned from the call should be used to signal when you're done listening:
+
+    settings.removeListener(settingsListener)
+    
+This current listener implementation is not designed with any sort of thread-safety so it's recommended to only interact with these APIs from the main thread of your application.
+
+The listener APIs make use of the Kotlin `@Experimental` annotation. All usages must be marked with `@ExperimentalListener` or `@UseExperimental(ExperimentalListener::class)`.
+
 ## Project Structure
-The library logic lives in the module `multiplatform-settings` and its `common`, `android`, and `ios` submodules. The common module holds `expect` declarations for the `Settings` class, which can persist values of the `Int`, `Long`, `String`, `Float`, `Double`, and `Boolean` types. It also holds property delegate wrappers and other operator functions for cleaner syntax and usage. The android and ios modules then hold `actual` declarations, delegating to `SharedPreferences` or `NSUserDefaults`.
+The library logic lives in the `commonMain`, `androidMain`, and `iosMain` sources. The common source holds the `Settings` interface which exposes apis for persisting values of the `Int`, `Long`, `String`, `Float`, `Double`, and `Boolean` types. The common source also holds property delegate wrappers and other operator functions for cleaner syntax and usage. The android and ios sources then hold implementations, delegating to `SharedPreferences` or `NSUserDefaults`. The macOS platform reads from the same sources as iOS. The experimental JVM and JS implementations reside in the `jvmMain` and `jsMain` sources, respectively
 
-Some simple unit tests are defined which can be run via `./gradlew test`. These use Robolectric on Android to mock out the platform-specific behavior, and use the `macos` target to run the native tests.
+Some unit tests are defined which can be run via `./gradlew test`. These use Robolectric on Android to mock out the android-specific behavior, and use the ios simulator to run the ios tests. The macOS tests run natively on macOS hosts. The experimental JS implementation is configured to run tests with Mocha, and the experimental JVM implementation runs standard junit tests.
 
-There is also a sample project to demonstrate usage, which is configured as a separate IDEA/gradle project in the `sample` directory. It includes a `shared` module with `common`, `android`, and `ios` submodules, to demo a shared logic layer consuming the library. It also includes an `app-android` module which consumes `shared:android` and defines an Android UI, as well as an Xcode project in the `app-ios` directory which consumes the framework exported from `shared:ios` and holds an iOS UI.
-
-In order to build the library, you must supply a file in the root directory called `keys.properties`, which defines the properties `bintrayUser` and `bintrayKey`. These are used to upload build artifacts to bintray. The sample project can be built separately and shouldn't need any additional configuration.
+There is also a sample project to demonstrate usage, which is configured as a separate IDEA/gradle project in the `sample` directory. It includes a `shared` module with common, android, and ios sources, to demo a shared logic layer consuming the library. The `app-android` module consumes `shared` and provides an Android UI. The `app-ios` directory holds an Xcode project which builds an iOS app in the usual way, consuming a framework produced by `shared`. The `app-tornadofx` module consumes `shared` and produces a TornadoFX UI. The sample project does not currently have implementations on macOS or JS.
+ 
+ The `shared` module includes some simple unit tests in common code to demonstrate manually mocking out the `Settings` interface when testing code that interacts with it.
 
 ## License
         
-    Copyright 2018 Russell Wolf
+    Copyright 2018-2019 Russell Wolf
     
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.

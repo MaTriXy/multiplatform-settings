@@ -17,16 +17,27 @@
 package com.russhwolf.settings.example
 
 import android.os.Bundle
-import android.support.v7.app.AppCompatActivity
+import android.preference.PreferenceManager
+import android.view.View
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import com.russhwolf.settings.AndroidSettings
+import com.russhwolf.settings.ExperimentalListener
 
+@UseExperimental(ExperimentalListener::class)
 class MainActivity : AppCompatActivity() {
 
-    private val settingsRepository by lazy { settingsRepository(applicationContext) }
+    private val settingsRepository by lazy {
+        val sharedPrefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        val settings = AndroidSettings(sharedPrefs)
+        SettingsRepository(settings)
+    }
 
     private val typesSpinner by lazy { findViewById<Spinner>(R.id.types_spinner) }
     private val valueInput by lazy { findViewById<EditText>(R.id.value_input) }
@@ -34,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private val getButton by lazy { findViewById<Button>(R.id.get_button) }
     private val removeButton by lazy { findViewById<Button>(R.id.remove_button) }
     private val clearButton by lazy { findViewById<Button>(R.id.clear_button) }
+    private val loggerCheckBox by lazy { findViewById<CheckBox>(R.id.logger_checkbox) }
     private val output by lazy { findViewById<TextView>(R.id.output) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,11 +54,11 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         typesSpinner.adapter =
-                ArrayAdapter<SettingConfig<*>>(
-                    this,
-                    android.R.layout.simple_list_item_1,
-                    settingsRepository.mySettings
-                )
+            ArrayAdapter<SettingConfig<*>>(
+                this,
+                android.R.layout.simple_list_item_1,
+                settingsRepository.mySettings
+            )
 
         setButton.setOnClickListener {
             val settingConfig = typesSpinner.selectedItem as SettingConfig<*>
@@ -74,5 +86,16 @@ class MainActivity : AppCompatActivity() {
             output.text = "Settings cleared!"
         }
 
+        typesSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                loggerCheckBox.isChecked = settingsRepository.mySettings[position].isLoggingEnabled
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+        loggerCheckBox.setOnCheckedChangeListener { _, isChecked ->
+            val position = typesSpinner.selectedItemPosition
+            settingsRepository.mySettings[position].isLoggingEnabled = isChecked
+        }
     }
 }

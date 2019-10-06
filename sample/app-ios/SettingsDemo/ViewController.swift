@@ -22,8 +22,7 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
     @IBOutlet var typePicker: UIPickerView?
     @IBOutlet var valueInput: UITextField?
     @IBOutlet var outputText: UILabel?
-
-    lazy var settingsRepository: SharedSettingsRepository = Shared.settingsRepository()
+    @IBOutlet var loggingSwitch: UISwitch?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -45,6 +44,13 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
 
     func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
         return settingsRepository.mySettings.count
+    }
+    
+    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+        guard let row = typePicker?.selectedRow(inComponent: 0) else {
+            return
+        }
+        loggingSwitch?.isOn = settingsRepository.mySettings[row].isLoggingEnabled
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
@@ -88,4 +94,13 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
         settingsRepository.clear()
         outputText?.text = "Settings Cleared!"
     }
+    
+    @IBAction func onLoggingSwitchChanged() {
+        guard let row = typePicker?.selectedRow(inComponent: 0) else {
+            return
+        }
+        settingsRepository.mySettings[row].isLoggingEnabled = loggingSwitch?.isOn ?? false
+    }
 }
+
+let settingsRepository: SettingsRepository = SettingsRepository(settings: AppleSettings(delegate: UserDefaults.standard))

@@ -2,8 +2,8 @@
 //  Shared.h
 //  Shared
 //
-//  Created by Russell Wolf on 5/28/18.
-//  Copyright © 2018 Russell Wolf. All rights reserved.
+//  Created by Russell Wolf on 1/24/19.
+//  Copyright © 2019 Russell Wolf. All rights reserved.
 //
 
 #import <UIKit/UIKit.h>
