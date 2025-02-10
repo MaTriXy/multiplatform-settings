@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
-
 /*
  * Copyright 2019 Russell Wolf
  *
@@ -16,92 +14,37 @@ import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
  * limitations under the License.
  */
 
+import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
+
 plugins {
-    kotlin("multiplatform")
-    id("com.android.library")
+    id("standard-configuration")
+}
+
+standardConfig {
+    defaultTargets()
 }
 
 kotlin {
-    android()
-    jvm()
-    iosArm64("ios")
-    iosArm32("ios32")
-    iosX64("iosSim")
-    macosX64("macos")
-    js {
-        browser()
-        compilations.all {
-            tasks.withType<Kotlin2JsCompile> {
-                kotlinOptions {
-                    metaInfo = true
-                    sourceMap = true
-                    moduleKind = "umd"
-                }
-            }
-        }
-    }
+    explicitApi = ExplicitApiMode.Disabled
+
     sourceSets {
-        all {
-            languageSettings.apply {
-                useExperimentalAnnotation("kotlin.Experimental")
-            }
-        }
         commonMain {
             dependencies {
-                implementation(kotlin("stdlib-common"))
-
                 implementation(project(":multiplatform-settings"))
 
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
+                implementation(libs.kotlin.test)
             }
         }
 
-        val androidMain by getting {
+        val jvmCommonMain by getting {
             dependencies {
-                implementation(kotlin("stdlib"))
-
-                implementation(kotlin("test"))
-                implementation(kotlin("test-junit"))
-                implementation("junit:junit:4.12")
-            }
-        }
-
-        val jvmMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib"))
-
-                implementation(kotlin("test"))
-                implementation(kotlin("test-junit"))
-                implementation("junit:junit:4.12")
-            }
-        }
-
-        val iosMain by getting
-        val ios32Main by getting {
-            dependsOn(iosMain)
-        }
-        val iosSimMain by getting {
-            dependsOn(iosMain)
-        }
-        val macosMain by getting {
-            dependsOn(iosMain)
-        }
-
-        val jsMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib-js"))
-
-                implementation(kotlin("test-js"))
+                implementation(libs.kotlin.test.junit)
+                implementation(libs.junit)
             }
         }
     }
 }
 
 android {
-    compileSdkVersion(29)
-
-    defaultConfig {
-        minSdkVersion(15)
-    }
+    namespace = "com.russhwolf.settings.tests"
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Russell Wolf
+ * Copyright 2020 Russell Wolf
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,26 +15,26 @@
  */
 
 plugins {
-    kotlin("multiplatform") version "1.3.50" apply false
-    id("com.android.library") version "3.5.0" apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.nexus.publish)
+    alias(libs.plugins.kotlin.binaryCompatibilityValidator)
 }
 
-subprojects {
+allprojects {
     group = "com.russhwolf"
-    version = "0.4"
+}
 
+nexusPublishing {
     repositories {
-        google()
-        jcenter()
+        sonatype()
     }
+}
 
-    tasks.withType(AbstractTestTask::class) {
-        testLogging {
-            showStandardStreams = true
-            events("passed", "failed")
-        }
+apiValidation {
+    ignoredProjects.add("tests")
+    @OptIn(kotlinx.validation.ExperimentalBCVApi::class)
+    klib {
+        enabled = true
     }
-
-    // workaround for https://youtrack.jetbrains.com/issue/KT-27170
-    configurations.create("compileClasspath")
 }

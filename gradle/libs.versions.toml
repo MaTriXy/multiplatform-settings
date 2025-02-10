@@ -1,0 +1,59 @@
+[versions]
+multiplatformSettings = "1.4.0-SNAPSHOT"
+
+kotlin = "2.1.0"
+#noinspection GradleDependency
+conventionKotlin = "2.0.21" # Convention plugins sometimes need older Kotlin for compatibility with kotlin-dsl plugin
+
+android-gradle = "8.7.2"
+android-minSdk = "21"
+android-compileSdk = "35"
+
+kotlinx-browser = "0.3"
+kotlinx-coroutines = "1.9.0"
+kotlinx-serialization = "1.7.3"
+
+androidx-datastore = "1.1.1"
+androidx-preference = "1.2.1"
+androidx-startup = "1.2.0"
+androidx-test = "1.6.1"
+androidx-testExt = "1.2.1"
+
+binaryCompatibilityValidator = "0.16.3"
+nexus-publish = "2.0.0"
+junit = "4.13.2"
+okio = "3.9.1"
+robolectric = "4.14.1"
+turbine = "1.2.0"
+
+
+[libraries]
+kotlin-gradle = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "conventionKotlin" }
+kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "conventionKotlin" }
+android-gradle = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
+
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
+
+kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
+
+androidx-datastore-preferences-core = { module = "androidx.datastore:datastore-preferences-core", version.ref = "androidx-datastore" }
+androidx-preference = { module = "androidx.preference:preference", version.ref = "androidx-preference" }
+androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version.ref = "androidx-startup" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test" }
+androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-testExt" }
+
+junit = { module = "junit:junit", version.ref = "junit" }
+okio-fakefilesystem = { module = "com.squareup.okio:okio-fakefilesystem", version.ref = "okio" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "android-gradle" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-binaryCompatibilityValidator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "binaryCompatibilityValidator" }
+nexus-publish = { id = "io.github.gradle-nexus.publish-plugin", version.ref = "nexus-publish" }

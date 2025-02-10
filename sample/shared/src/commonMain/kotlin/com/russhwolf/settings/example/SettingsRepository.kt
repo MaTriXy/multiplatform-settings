@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Russell Wolf
+ * Copyright 2020 Russell Wolf
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,9 @@
 
 package com.russhwolf.settings.example
 
-import com.russhwolf.settings.ExperimentalListener
 import com.russhwolf.settings.ObservableSettings
-import kotlin.properties.ReadWriteProperty
-
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SettingsListener
-import com.russhwolf.settings.boolean
-import com.russhwolf.settings.contains
-import com.russhwolf.settings.double
-import com.russhwolf.settings.float
-import com.russhwolf.settings.int
-import com.russhwolf.settings.long
-import com.russhwolf.settings.minusAssign
-import com.russhwolf.settings.nullableBoolean
-import com.russhwolf.settings.nullableDouble
-import com.russhwolf.settings.nullableFloat
-import com.russhwolf.settings.nullableInt
-import com.russhwolf.settings.nullableLong
-import com.russhwolf.settings.nullableString
-import com.russhwolf.settings.string
 
 /**
  * This class demonstrates common code exercising all of the functionality of the [Settings] class.
@@ -63,44 +46,46 @@ class SettingsRepository(private val settings: Settings) {
 
 /**
  * This class wraps all of the different operations that might be performed on a given [key], and adds an interface to
- * get and set it as a [String] value..
+ * get and set it as a [String] value.
  */
 sealed class SettingConfig<T>(
     private val settings: Settings,
     val key: String,
-    defaultValue: T,
-    delegate: Settings.(String, T) -> ReadWriteProperty<Any?, T>,
-    private val toType: String.() -> T
+    private val defaultValue: T
 ) {
-    private var value: T by settings.delegate(key, defaultValue)
+    protected abstract fun getStringValue(settings: Settings, key: String, defaultValue: T): String
+    protected abstract fun setStringValue(settings: Settings, key: String, value: String)
+    protected abstract fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: T,
+        callback: (T) -> Unit
+    ): SettingsListener
 
-    @ExperimentalListener
     private var listener: SettingsListener? = null
 
-    fun remove() {
-        settings -= key
-    }
+    fun remove() = settings.remove(key)
+    fun exists(): Boolean = settings.hasKey(key)
 
-    fun exists(): Boolean = key in settings
-    fun get(): String = value.toString()
+    fun get(): String = getStringValue(settings, key, defaultValue)
     fun set(value: String): Boolean {
         return try {
-            this.value = value.toType()
+            setStringValue(settings, key, value)
             true
         } catch (exception: Exception) {
             false
         }
     }
 
-    @ExperimentalListener
     var isLoggingEnabled: Boolean
         get() = listener != null
         set(value) {
             val settings = settings as? ObservableSettings ?: return
             listener = if (value) {
-                settings.addListener(key) { println("$key = ${get()}") }
+                listener?.deactivate() // just in case
+                addListener(settings, key, defaultValue) { println("$key = ${get()}") }
             } else {
-                listener?.let { settings.removeListener(it) }
+                listener?.deactivate()
                 null
             }
         }
@@ -110,43 +95,215 @@ sealed class SettingConfig<T>(
 
 sealed class NullableSettingConfig<T : Any>(
     settings: Settings,
-    key: String,
-    delegate: Settings.(String) -> ReadWriteProperty<Any?, T?>,
-    toType: String.() -> T
-) : SettingConfig<T?>(settings, key, null, { it, _ -> delegate(it) }, toType)
+    key: String
+) : SettingConfig<T?>(settings, key, null) {
 
-class StringSettingConfig(settings: Settings, key: String, defaultValue: String = "") :
-    SettingConfig<String>(settings, key, defaultValue, Settings::string, { this })
+    protected abstract fun getStringValue(settings: Settings, key: String): String
 
-class IntSettingConfig(settings: Settings, key: String, defaultValue: Int = 0) :
-    SettingConfig<Int>(settings, key, defaultValue, Settings::int, String::toInt)
+    final override fun getStringValue(settings: Settings, key: String, defaultValue: T?): String =
+        getStringValue(settings, key)
 
-class LongSettingConfig(settings: Settings, key: String, defaultValue: Long = 0) :
-    SettingConfig<Long>(settings, key, defaultValue, Settings::long, String::toLong)
+    protected abstract fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        callback: (T?) -> Unit
+    ): SettingsListener
 
-class FloatSettingConfig(settings: Settings, key: String, defaultValue: Float = 0f) :
-    SettingConfig<Float>(settings, key, defaultValue, Settings::float, String::toFloat)
+    final override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: T?,
+        callback: (T?) -> Unit
+    ): SettingsListener =
+        addListener(settings, key, null, callback)
+}
 
-class DoubleSettingConfig(settings: Settings, key: String, defaultValue: Double = 0.0) :
-    SettingConfig<Double>(settings, key, defaultValue, Settings::double, String::toDouble)
+class StringSettingConfig(settings: Settings, key: String, defaultValue: String) :
+    SettingConfig<String>(settings, key, defaultValue) {
 
-class BooleanSettingConfig(settings: Settings, key: String, defaultValue: Boolean = false) :
-    SettingConfig<Boolean>(settings, key, defaultValue, Settings::boolean, String::toBoolean)
+    override fun getStringValue(settings: Settings, key: String, defaultValue: String): String =
+        settings.getString(key, defaultValue)
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putString(key, value)
+
+    override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: String,
+        callback: (String) -> Unit
+    ): SettingsListener =
+        settings.addStringListener(key, defaultValue, callback)
+}
+
+class IntSettingConfig(settings: Settings, key: String, defaultValue: Int) :
+    SettingConfig<Int>(settings, key, defaultValue) {
+
+    override fun getStringValue(settings: Settings, key: String, defaultValue: Int): String =
+        settings.getInt(key, defaultValue).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putInt(key, value.toInt())
+
+    override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: Int,
+        callback: (Int) -> Unit
+    ): SettingsListener =
+        settings.addIntListener(key, defaultValue, callback)
+}
+
+class LongSettingConfig(settings: Settings, key: String, defaultValue: Long) :
+    SettingConfig<Long>(settings, key, defaultValue) {
+
+    override fun getStringValue(settings: Settings, key: String, defaultValue: Long): String =
+        settings.getLong(key, defaultValue).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putLong(key, value.toLong())
+
+    override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: Long,
+        callback: (Long) -> Unit
+    ): SettingsListener =
+        settings.addLongListener(key, defaultValue, callback)
+}
+
+class FloatSettingConfig(settings: Settings, key: String, defaultValue: Float) :
+    SettingConfig<Float>(settings, key, defaultValue) {
+
+    override fun getStringValue(settings: Settings, key: String, defaultValue: Float): String =
+        settings.getFloat(key, defaultValue).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putFloat(key, value.toFloat())
+
+    override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: Float,
+        callback: (Float) -> Unit
+    ): SettingsListener =
+        settings.addFloatListener(key, defaultValue, callback)
+}
+
+class DoubleSettingConfig(settings: Settings, key: String, defaultValue: Double) :
+    SettingConfig<Double>(settings, key, defaultValue) {
+
+    override fun getStringValue(settings: Settings, key: String, defaultValue: Double): String =
+        settings.getDouble(key, defaultValue).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putDouble(key, value.toDouble())
+
+    override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: Double,
+        callback: (Double) -> Unit
+    ): SettingsListener =
+        settings.addDoubleListener(key, defaultValue, callback)
+}
+
+class BooleanSettingConfig(settings: Settings, key: String, defaultValue: Boolean) :
+    SettingConfig<Boolean>(settings, key, defaultValue) {
+
+    override fun getStringValue(settings: Settings, key: String, defaultValue: Boolean): String =
+        settings.getBoolean(key, defaultValue).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putBoolean(key, value.toBoolean())
+
+    override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        defaultValue: Boolean,
+        callback: (Boolean) -> Unit
+    ): SettingsListener =
+        settings.addBooleanListener(key, defaultValue, callback)
+}
 
 class NullableStringSettingConfig(settings: Settings, key: String) :
-    NullableSettingConfig<String>(settings, key, Settings::nullableString, { this })
+    NullableSettingConfig<String>(settings, key) {
+
+    override fun getStringValue(settings: Settings, key: String): String =
+        settings.getStringOrNull(key).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putString(key, value)
+
+    override fun addListener(settings: ObservableSettings, key: String, callback: (String?) -> Unit): SettingsListener =
+        settings.addStringOrNullListener(key, callback)
+}
 
 class NullableIntSettingConfig(settings: Settings, key: String) :
-    NullableSettingConfig<Int>(settings, key, Settings::nullableInt, String::toInt)
+    NullableSettingConfig<Int>(settings, key) {
+
+    override fun getStringValue(settings: Settings, key: String): String =
+        settings.getIntOrNull(key).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putInt(key, value.toInt())
+
+    override fun addListener(settings: ObservableSettings, key: String, callback: (Int?) -> Unit): SettingsListener =
+        settings.addIntOrNullListener(key, callback)
+}
 
 class NullableLongSettingConfig(settings: Settings, key: String) :
-    NullableSettingConfig<Long>(settings, key, Settings::nullableLong, String::toLong)
+    NullableSettingConfig<Long>(settings, key) {
+
+    override fun getStringValue(settings: Settings, key: String): String =
+        settings.getLongOrNull(key).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putLong(key, value.toLong())
+
+    override fun addListener(settings: ObservableSettings, key: String, callback: (Long?) -> Unit): SettingsListener =
+        settings.addLongOrNullListener(key, callback)
+}
 
 class NullableFloatSettingConfig(settings: Settings, key: String) :
-    NullableSettingConfig<Float>(settings, key, Settings::nullableFloat, String::toFloat)
+    NullableSettingConfig<Float>(settings, key) {
+
+    override fun getStringValue(settings: Settings, key: String): String =
+        settings.getFloatOrNull(key).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putFloat(key, value.toFloat())
+
+    override fun addListener(settings: ObservableSettings, key: String, callback: (Float?) -> Unit): SettingsListener =
+        settings.addFloatOrNullListener(key, callback)
+}
 
 class NullableDoubleSettingConfig(settings: Settings, key: String) :
-    NullableSettingConfig<Double>(settings, key, Settings::nullableDouble, String::toDouble)
+    NullableSettingConfig<Double>(settings, key) {
+
+    override fun getStringValue(settings: Settings, key: String): String =
+        settings.getDoubleOrNull(key).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putDouble(key, value.toDouble())
+
+    override fun addListener(settings: ObservableSettings, key: String, callback: (Double?) -> Unit): SettingsListener =
+        settings.addDoubleOrNullListener(key, callback)
+}
 
 class NullableBooleanSettingConfig(settings: Settings, key: String) :
-    NullableSettingConfig<Boolean>(settings, key, Settings::nullableBoolean, String::toBoolean)
+    NullableSettingConfig<Boolean>(settings, key) {
+
+    override fun getStringValue(settings: Settings, key: String): String =
+        settings.getBooleanOrNull(key).toString()
+
+    override fun setStringValue(settings: Settings, key: String, value: String) =
+        settings.putBoolean(key, value.toBoolean())
+
+    override fun addListener(
+        settings: ObservableSettings,
+        key: String,
+        callback: (Boolean?) -> Unit
+    ): SettingsListener =
+        settings.addBooleanOrNullListener(key, callback)
+}

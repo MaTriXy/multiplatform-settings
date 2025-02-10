@@ -1,7 +1,5 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 /*
- * Copyright 2018 Russell Wolf
+ * Copyright 2020 Russell Wolf
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,15 +17,22 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     id("com.android.application")
     kotlin("android")
+    kotlin("plugin.compose")
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 android {
-    compileSdkVersion(29)
+    namespace = "com.russhwolf.settings.example.android"
+
+    compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.russhwolf.settings.example"
-        minSdkVersion(15)
-        targetSdkVersion(29)
+        applicationId = "com.russhwolf.settings.example.android"
+        minSdk = 21
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -37,22 +42,27 @@ android {
 
     buildTypes {
         val release by getting {
-            this as? com.android.build.api.dsl.model.BuildType
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
+    }
+
+    buildFeatures {
+        compose = true
     }
 }
 
 dependencies {
     implementation(project(":shared"))
     implementation(fileTree("include" to listOf("*.jar"), "dir" to "libs"))
-    implementation(kotlin("stdlib"))
-    implementation("androidx.appcompat:appcompat:1.1.0")
-    implementation("androidx.constraintlayout:constraintlayout:1.1.3")
+    implementation(platform("androidx.compose:compose-bom:2024.09.02"))
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("com.russhwolf:multiplatform-settings:${rootProject.ext["library_version"]}")
-}
-
-tasks.withType<KotlinCompile>().all {
-    kotlinOptions.freeCompilerArgs += "-Xuse-experimental=kotlin.Experimental"
 }

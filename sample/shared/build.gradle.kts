@@ -1,7 +1,7 @@
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 /*
- * Copyright 2018 Russell Wolf
+ * Copyright 2020 Russell Wolf
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,57 +22,52 @@ plugins {
 }
 
 kotlin {
-    android()
-    jvm()
+    applyDefaultHierarchyTemplate()
+    jvmToolchain(17)
 
-    val isDevice = System.getenv("SDK_NAME")?.startsWith("iphoneos") == true
-    val iosTarget = if (isDevice) {
-        presets.getByName("iosArm64")
-    } else {
-        presets.getByName("iosX64")
+    androidTarget()
+    jvm()
+    js {
+        browser()
     }
-    targetFromPreset(iosTarget, "ios") {
-        this as KotlinNativeTarget
-        binaries {
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+        iosX64()
+    ).onEach {
+        it.binaries {
             framework("Shared") {
+                // Make AppleSettings visible from Swift
                 export("com.russhwolf:multiplatform-settings:${rootProject.ext["library_version"]}")
-                if (isDevice) {
-                    export("com.russhwolf:multiplatform-settings-ios:${rootProject.ext["library_version"]}")
-                } else {
-                    export("com.russhwolf:multiplatform-settings-iossim:${rootProject.ext["library_version"]}")
-                }
+                transitiveExport = true
             }
         }
     }
 
     sourceSets {
-        all {
-            languageSettings.apply {
-                useExperimentalAnnotation("kotlin.Experimental")
-            }
-        }
-        
         commonMain {
             dependencies {
                 api("com.russhwolf:multiplatform-settings:${rootProject.ext["library_version"]}")
-                implementation(kotlin("stdlib-common"))
             }
         }
         commonTest {
             dependencies {
                 implementation("com.russhwolf:multiplatform-settings-test:${rootProject.ext["library_version"]}")
-                
+
                 implementation(kotlin("test"))
-                implementation(kotlin("test-annotations-common"))
             }
         }
 
         val androidMain by getting {
             dependencies {
-                implementation(kotlin("stdlib"))
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
             }
@@ -80,12 +75,20 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
-                implementation(kotlin("stdlib"))
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
+            }
+        }
+
+        val jsMain by getting {
+            dependencies {
+            }
+        }
+        val jsTest by getting {
+            dependencies {
             }
         }
 
@@ -101,38 +104,11 @@ kotlin {
 }
 
 android {
-    compileSdkVersion(29)
+    namespace = "com.russhwolf.settings.example"
+
+    compileSdk = 35
 
     defaultConfig {
-        minSdkVersion(15)
+        minSdk = 21
     }
 }
-
-task("copyFramework") {
-    val buildType = project.findProperty("kotlin.build.type") as? String ?: "DEBUG"
-    val framework = (kotlin.targets["ios"] as KotlinNativeTarget).compilations["main"].target.binaries.findFramework("Shared", buildType)!!
-    dependsOn(framework.linkTask)
-
-    doLast {
-        val srcFile = framework.outputFile
-        val targetDir = project.property("configuration.build.dir") as? String ?: ""
-        copy {
-            from(srcFile.parent)
-            into(targetDir)
-            include("Shared.framework/**")
-            include("Shared.framework.dSYM")
-        }
-    }
-}
-
-task("iosTest") {
-    dependsOn("linkDebugTestIos")
-    doLast {
-        val testBinaryPath =
-            (kotlin.targets["ios"] as KotlinNativeTarget).binaries.getTest("DEBUG").outputFile.absolutePath
-        exec {
-            commandLine("xcrun", "simctl", "spawn", "--standalone", "iPhone Xʀ", testBinaryPath)
-        }
-    }
-}
-tasks["check"].dependsOn("iosTest")

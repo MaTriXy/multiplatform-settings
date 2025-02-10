@@ -1,0 +1,4 @@
+public final class com/russhwolf/settings/NoArgKt {
+	public static final fun Settings ()Lcom/russhwolf/settings/Settings;
+}
+

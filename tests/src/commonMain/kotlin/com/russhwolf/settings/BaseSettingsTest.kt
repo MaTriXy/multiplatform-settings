@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Russell Wolf
+ * Copyright 2020 Russell Wolf
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,10 +30,11 @@ import kotlin.test.assertTrue
 abstract class BaseSettingsTest(
     platformFactory: Settings.Factory,
     private val hasNamedInstances: Boolean = true,
+    private val allowsDuplicateInstances: Boolean = true,
     private val hasListeners: Boolean = true,
     private val syncListeners: () -> Unit = {}
 ) {
-    private lateinit var settings: Settings
+    protected lateinit var settings: Settings
 
     private val settingsFactory: Settings.Factory = object : Settings.Factory {
         override fun create(name: String?): Settings = platformFactory.create(name).also { it.clear() }
@@ -45,12 +46,36 @@ abstract class BaseSettingsTest(
     }
 
     @Test
+    fun keys() {
+        val initialSize = settings.keys.size // Note this might be nonempty on initialization (eg iOS)
+        assertFalse("a" in settings.keys)
+        settings.putInt("a", 5)
+        assertTrue("a" in settings.keys)
+        assertEquals(initialSize + 1, settings.keys.size)
+        settings.clear()
+        assertFalse("a" in settings.keys)
+        assertEquals(initialSize, settings.keys.size)
+    }
+
+    @Test
+    fun size() {
+        val initialSize = settings.size // Note this might be nonzero on initialization (eg iOS)
+        assertEquals(settings.size, settings.keys.size)
+        settings.putInt("a", 5)
+        assertEquals(initialSize + 1, settings.size)
+        assertEquals(settings.size, settings.keys.size)
+        settings.clear()
+        assertEquals(initialSize, settings.size)
+        assertEquals(settings.size, settings.keys.size)
+    }
+
+    @Test
     fun clear() {
         settings.putInt("a", 4)
         settings.putString("b", "value")
         settings.clear()
-        assertEquals(0, settings.getInt("a"))
-        assertEquals("", settings.getString("b"))
+        assertEquals(0, settings.getInt("a", 0))
+        assertEquals("", settings.getString("b", ""))
     }
 
     @Test
@@ -58,12 +83,14 @@ abstract class BaseSettingsTest(
         settings.putInt("a", 3)
         settings.putString("b", "value")
         settings.remove("a")
-        assertEquals(0, settings.getInt("a"))
-        assertEquals("value", settings.getString("b"))
+        settings.remove("c")
+        assertEquals(0, settings.getInt("a", 0))
+        assertEquals("value", settings.getString("b", ""))
 
         settings["a"] = 3
         settings["b"] = "value"
         settings -= "a"
+        settings -= "c"
         assertEquals(-1, settings["a", -1])
         assertEquals("value", settings["b", "default"])
 
@@ -82,13 +109,13 @@ abstract class BaseSettingsTest(
 
     @Test
     fun intBasic() {
-        assertEquals(0, settings.getInt("a"))
+        assertEquals(0, settings.getInt("a", 0))
         settings.putInt("a", 2)
-        assertEquals(2, settings.getInt("a"))
+        assertEquals(2, settings.getInt("a", 0))
         settings.putInt("a", Int.MIN_VALUE)
-        assertEquals(Int.MIN_VALUE, settings.getInt("a"))
+        assertEquals(Int.MIN_VALUE, settings.getInt("a", 0))
         settings.putInt("a", Int.MAX_VALUE)
-        assertEquals(Int.MAX_VALUE, settings.getInt("a"))
+        assertEquals(Int.MAX_VALUE, settings.getInt("a", 0))
 
         assertEquals(5, settings.getInt("b", 5))
     }
@@ -126,7 +153,7 @@ abstract class BaseSettingsTest(
         a = 0
         assertEquals(0, a)
 
-        val b by settings.int("b")
+        val b by settings.int("b", 0)
         assertEquals(0, b)
     }
 
@@ -151,7 +178,7 @@ abstract class BaseSettingsTest(
         a = 0
         assertEquals(0, a)
 
-        val b by settings.int()
+        val b by settings.int(defaultValue = 0)
         assertEquals(0, b)
     }
 
@@ -169,13 +196,13 @@ abstract class BaseSettingsTest(
 
     @Test
     fun longBasic() {
-        assertEquals(0L, settings.getLong("a"))
+        assertEquals(0L, settings.getLong("a", 0L))
         settings.putLong("a", 2L)
-        assertEquals(2L, settings.getLong("a"))
+        assertEquals(2L, settings.getLong("a", 0L))
         settings.putLong("a", Long.MIN_VALUE)
-        assertEquals(Long.MIN_VALUE, settings.getLong("a"))
+        assertEquals(Long.MIN_VALUE, settings.getLong("a", 0L))
         settings.putLong("a", Long.MAX_VALUE)
-        assertEquals(Long.MAX_VALUE, settings.getLong("a"))
+        assertEquals(Long.MAX_VALUE, settings.getLong("a", 0L))
 
         assertEquals(5L, settings.getLong("b", 5L))
     }
@@ -213,7 +240,7 @@ abstract class BaseSettingsTest(
         a = 0L
         assertEquals(0L, a)
 
-        val b by settings.long("b")
+        val b by settings.long("b", 0)
         assertEquals(0L, b)
     }
 
@@ -238,7 +265,7 @@ abstract class BaseSettingsTest(
         a = 0L
         assertEquals(0L, a)
 
-        val b by settings.long()
+        val b by settings.long(defaultValue = 0)
         assertEquals(0L, b)
     }
 
@@ -256,9 +283,11 @@ abstract class BaseSettingsTest(
 
     @Test
     fun stringBasic() {
-        assertEquals("", settings.getString("a"))
+        assertEquals("", settings.getString("a", ""))
         settings.putString("a", "value")
-        assertEquals("value", settings.getString("a"))
+        assertEquals("value", settings.getString("a", ""))
+        settings.putString("a", "τ > 🥧")
+        assertEquals("τ > 🥧", settings.getString("a", ""))
 
         assertEquals("default", settings.getString("b", "default"))
     }
@@ -296,7 +325,7 @@ abstract class BaseSettingsTest(
         a = ""
         assertEquals("", a)
 
-        val b by settings.string("b")
+        val b by settings.string("b", "")
         assertEquals("", b)
     }
 
@@ -321,7 +350,7 @@ abstract class BaseSettingsTest(
         a = ""
         assertEquals("", a)
 
-        val b by settings.string("b")
+        val b by settings.string(defaultValue = "")
         assertEquals("", b)
     }
 
@@ -339,19 +368,19 @@ abstract class BaseSettingsTest(
 
     @Test
     fun floatBasic() {
-        assertEquals(0f, settings.getFloat("a"))
+        assertEquals(0f, settings.getFloat("a", 0f))
         settings.putFloat("a", 2f)
-        assertEquals(2f, settings.getFloat("a"))
+        assertEquals(2f, settings.getFloat("a", 0f))
         settings.putFloat("a", Float.MIN_VALUE)
-        assertEquals(Float.MIN_VALUE, settings.getFloat("a"))
+        assertEquals(Float.MIN_VALUE, settings.getFloat("a", 0f))
         settings.putFloat("a", Float.MAX_VALUE)
-        assertEquals(Float.MAX_VALUE, settings.getFloat("a"))
+        assertEquals(Float.MAX_VALUE, settings.getFloat("a", 0f))
         settings.putFloat("a", Float.NEGATIVE_INFINITY)
-        assertEquals(Float.NEGATIVE_INFINITY, settings.getFloat("a"))
+        assertEquals(Float.NEGATIVE_INFINITY, settings.getFloat("a", 0f))
         settings.putFloat("a", Float.POSITIVE_INFINITY)
-        assertEquals(Float.POSITIVE_INFINITY, settings.getFloat("a"))
+        assertEquals(Float.POSITIVE_INFINITY, settings.getFloat("a", 0f))
         settings.putFloat("a", Float.NaN)
-        assertEquals(Float.NaN, settings.getFloat("a"))
+        assertEquals(Float.NaN, settings.getFloat("a", 0f))
 
         assertEquals(5f, settings.getFloat("b", 5f))
     }
@@ -389,7 +418,7 @@ abstract class BaseSettingsTest(
         a = 0f
         assertEquals(0f, a)
 
-        val b by settings.float("b")
+        val b by settings.float("b", 0f)
         assertEquals(0f, b)
     }
 
@@ -414,7 +443,7 @@ abstract class BaseSettingsTest(
         a = 0f
         assertEquals(0f, a)
 
-        val b by settings.float()
+        val b by settings.float(defaultValue = 0f)
         assertEquals(0f, b)
     }
 
@@ -432,19 +461,19 @@ abstract class BaseSettingsTest(
 
     @Test
     fun doubleBasic() {
-        assertEquals(0.0, settings.getDouble("a"))
+        assertEquals(0.0, settings.getDouble("a", 0.0))
         settings.putDouble("a", 2.0)
-        assertEquals(2.0, settings.getDouble("a"))
+        assertEquals(2.0, settings.getDouble("a", 0.0))
         settings.putDouble("a", Double.MIN_VALUE)
-        assertEquals(Double.MIN_VALUE, settings.getDouble("a"))
+        assertEquals(Double.MIN_VALUE, settings.getDouble("a", 0.0))
         settings.putDouble("a", Double.MAX_VALUE)
-        assertEquals(Double.MAX_VALUE, settings.getDouble("a"))
+        assertEquals(Double.MAX_VALUE, settings.getDouble("a", 0.0))
         settings.putDouble("a", Double.NEGATIVE_INFINITY)
-        assertEquals(Double.NEGATIVE_INFINITY, settings.getDouble("a"))
+        assertEquals(Double.NEGATIVE_INFINITY, settings.getDouble("a", 0.0))
         settings.putDouble("a", Double.POSITIVE_INFINITY)
-        assertEquals(Double.POSITIVE_INFINITY, settings.getDouble("a"))
+        assertEquals(Double.POSITIVE_INFINITY, settings.getDouble("a", 0.0))
         settings.putDouble("a", Double.NaN)
-        assertEquals(Double.NaN, settings.getDouble("a"))
+        assertEquals(Double.NaN, settings.getDouble("a", 0.0))
 
         assertEquals(5.0, settings.getDouble("b", 5.0))
     }
@@ -483,7 +512,7 @@ abstract class BaseSettingsTest(
         a = 0.0
         assertEquals(0.0, a)
 
-        val b by settings.double("b")
+        val b by settings.double("b", 0.0)
         assertEquals(0.0, b)
     }
 
@@ -508,7 +537,7 @@ abstract class BaseSettingsTest(
         a = 0.0
         assertEquals(0.0, a)
 
-        val b by settings.double()
+        val b by settings.double(defaultValue = 0.0)
         assertEquals(0.0, b)
     }
 
@@ -526,9 +555,9 @@ abstract class BaseSettingsTest(
 
     @Test
     fun booleanBasic() {
-        assertEquals(false, settings.getBoolean("a"))
+        assertEquals(false, settings.getBoolean("a", false))
         settings.putBoolean("a", true)
-        assertEquals(true, settings.getBoolean("a"))
+        assertEquals(true, settings.getBoolean("a", false))
 
         assertEquals(true, settings.getBoolean("b", true))
     }
@@ -562,7 +591,7 @@ abstract class BaseSettingsTest(
         a = false
         assertEquals(false, a)
 
-        val b by settings.boolean("b")
+        val b by settings.boolean("b", false)
         assertEquals(false, b)
     }
 
@@ -583,7 +612,7 @@ abstract class BaseSettingsTest(
         a = false
         assertEquals(false, a)
 
-        val b by settings.boolean()
+        val b by settings.boolean(defaultValue = false)
         assertEquals(false, b)
     }
 
@@ -615,16 +644,16 @@ abstract class BaseSettingsTest(
     @Test
     @Suppress("UNUSED_VALUE", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     fun defaultKey() {
-        var a by settings.string()
+        var a by settings.string(defaultValue = "")
         a = "value"
-        assertEquals("value", settings.getString("a"))
+        assertEquals("value", settings.getStringOrNull("a"))
     }
 
     @Test
     fun delegateReuseTest() {
         // Is this a reasonable use-case? Might as well protect it for now. That way if we break it later it'll be on
         // purpose instead of by accident
-        val delegate = settings.int()
+        val delegate = settings.int(defaultValue = 0)
         var a by delegate
         var b by delegate
 
@@ -647,6 +676,8 @@ abstract class BaseSettingsTest(
 
     @Test
     fun multipleSameInstances() {
+        if (!allowsDuplicateInstances) return
+
         val settingsA = settingsFactory.create("com.russhwolf.multiplatform-settings.test.A")
         val settingsB = settingsFactory.create("com.russhwolf.multiplatform-settings.test.A")
         settingsA["a"] = 1
@@ -655,78 +686,148 @@ abstract class BaseSettingsTest(
     }
 
     @Test
-    @UseExperimental(ExperimentalListener::class)
     fun listener() {
         if (!hasListeners) return
 
         val settings = settings as? ObservableSettings
             ?: throw IllegalStateException("Must implement ObservableSettings or ignore this test")
 
-        val verifier = ListenerVerifier()
+        val verifier = ListenerValueVerifier<Int?>()
 
         // No invocation for call before listener was set
         settings["a"] = 2
-        val listener = settings.addListener("a", verifier.listener)
+        val listener = settings.addIntOrNullListener("a", verifier.listener)
         try {
             syncListeners()
-            verifier.assertNotInvoked()
+            verifier.assertNoValue()
 
             // No invocation on set to existing value
             settings["a"] = 2
             syncListeners()
-            verifier.assertNotInvoked()
+            verifier.assertNoValue()
 
             // New invocation on value change
             settings["a"] = 1
             syncListeners()
-            verifier.assertInvoked()
+            verifier.assertLastValue(1)
 
             // No invocation if value unchanged
             settings["a"] = 1
             syncListeners()
-            verifier.assertNotInvoked()
+            verifier.assertNoValue()
 
             // New invocation on remove
             settings -= "a"
             syncListeners()
-            verifier.assertInvoked()
+            verifier.assertLastValue(null)
 
             // New invocation on re-add with same value
             settings["a"] = 1
             syncListeners()
-            verifier.assertInvoked()
+            verifier.assertLastValue(1)
 
             // No invocation on other key change
             settings["b"] = 1
             syncListeners()
-            verifier.assertNotInvoked()
+            verifier.assertNoValue()
 
             // New invocation on clear
             settings.clear()
             syncListeners()
-            verifier.assertInvoked()
+            verifier.assertLastValue(null)
 
             // Second listener at the same key also gets called
-            val verifier2 = ListenerVerifier()
-            val listener2 = settings.addListener("a", verifier2.listener)
+            val verifier2 = ListenerValueVerifier<Int?>()
+            val listener2 = settings.addIntOrNullListener("a", verifier2.listener)
             try {
                 settings["a"] = 3
                 syncListeners()
-                verifier.assertInvoked()
-                verifier2.assertInvoked()
+                verifier.assertLastValue(3)
+                verifier2.assertLastValue(3)
 
                 // No invocation on listener which is removed
-                settings.removeListener(listener)
+                listener.deactivate()
                 settings["a"] = 2
                 syncListeners()
-                verifier.assertNotInvoked()
-                verifier2.assertInvoked()
+                verifier.assertNoValue()
+                verifier2.assertLastValue(2)
             } finally {
-                settings.removeListener(listener2)
+                listener2.deactivate()
             }
         } finally {
-            settings.removeListener(listener)
+            listener.deactivate()
         }
     }
+
+
+    private inline fun <reified T> typedListenerTest(
+        defaultValue: T,
+        otherValue: T,
+        addTypedListener: ObservableSettings.(String, T, (T) -> Unit) -> SettingsListener
+    ) {
+        if (!hasListeners) return
+
+        val settings = settings as? ObservableSettings
+            ?: throw IllegalStateException("Must implement ObservableSettings or ignore this test")
+
+        val verifier = ListenerValueVerifier<T>()
+
+        val listener = settings.addTypedListener("key", defaultValue, verifier.listener)
+        try {
+            verifier.assertNoValue()
+
+            settings["key"] = otherValue
+            syncListeners()
+            verifier.assertLastValue(otherValue)
+
+            settings -= "key"
+            syncListeners()
+            verifier.assertLastValue(defaultValue)
+        } finally {
+            listener.deactivate()
+        }
+    }
+
+    @Test
+    fun intListener() = typedListenerTest(-1, 1, ObservableSettings::addIntListener)
+
+    @Test
+    fun intOrNullListener() =
+        typedListenerTest(null, 1) { key, _, block -> addIntOrNullListener(key, block) }
+
+    @Test
+    fun longListener() = typedListenerTest(-1L, 1L, ObservableSettings::addLongListener)
+
+    @Test
+    fun longOrNullListener() =
+        typedListenerTest(null, 1L) { key, _, block -> addLongOrNullListener(key, block) }
+
+    @Test
+    fun stringListener() = typedListenerTest("default", "foo", ObservableSettings::addStringListener)
+
+    @Test
+    fun stringOrNullListener() =
+        typedListenerTest(null, "foo") { key, _, block -> addStringOrNullListener(key, block) }
+
+    @Test
+    fun floatListener() = typedListenerTest(-1f, 1f, ObservableSettings::addFloatListener)
+
+    @Test
+    fun floatOrNullListener() =
+        typedListenerTest(null, 1f) { key, _, block -> addFloatOrNullListener(key, block) }
+
+    @Test
+    fun doubleListener() = typedListenerTest(-1.0, 1.0, ObservableSettings::addDoubleListener)
+
+    @Test
+    fun doubleOrNullListener() =
+        typedListenerTest(null, 1.0) { key, _, block -> addDoubleOrNullListener(key, block) }
+
+    @Test
+    fun booleanListener() = typedListenerTest(true, false, ObservableSettings::addBooleanListener)
+
+    @Test
+    fun booleanOrNullListener() =
+        typedListenerTest(null, false) { key, _, block -> addBooleanOrNullListener(key, block) }
 
 }

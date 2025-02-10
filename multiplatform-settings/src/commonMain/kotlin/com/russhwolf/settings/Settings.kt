@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Russell Wolf
+ * Copyright 2020 Russell Wolf
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,8 +27,10 @@ package com.russhwolf.settings
  */
 public interface Settings {
 
+    public companion object;
+
     /**
-     * A factory that can produce [Settings] instances.
+     * A factory that can produce [Settings] instances or derivations thereof.
      */
     public interface Factory {
         /**
@@ -39,6 +41,16 @@ public interface Settings {
          */
         public fun create(name: String? = null): Settings
     }
+
+    /**
+     * Returns a `Set` containing all the keys present in this [Settings].
+     */
+    public val keys: Set<String>
+
+    /**
+     * Returns the number of key-value pairs present in this [Settings].
+     */
+    public val size: Int
 
     /**
      * Clears all values stored in this [Settings] instance.
@@ -64,7 +76,7 @@ public interface Settings {
      * Returns the `Int` value stored at [key], or [defaultValue] if no value was stored. If a value of a different
      * type was stored at `key`, the behavior is not defined.
      */
-    public fun getInt(key: String, defaultValue: Int = 0): Int
+    public fun getInt(key: String, defaultValue: Int): Int
 
     /**
      * Returns the `Int` value stored at [key], or `null` if no value was stored. If a value of a different type was
@@ -81,7 +93,7 @@ public interface Settings {
      * Returns the `Long` value stored at [key], or [defaultValue] if no value was stored. If a value of a different
      * type was stored at `key`, the behavior is not defined.
      */
-    public fun getLong(key: String, defaultValue: Long = 0): Long
+    public fun getLong(key: String, defaultValue: Long): Long
 
     /**
      * Returns the `Long` value stored at [key], or `null` if no value was stored. If a value of a different type was
@@ -98,7 +110,7 @@ public interface Settings {
      * Returns the `String` value stored at [key], or [defaultValue] if no value was stored. If a value of a different
      * type was stored at `key`, the behavior is not defined.
      */
-    public fun getString(key: String, defaultValue: String = ""): String
+    public fun getString(key: String, defaultValue: String): String
 
     /**
      * Returns the `String` value stored at [key], or `null` if no value was stored. If a value of a different type was
@@ -115,7 +127,7 @@ public interface Settings {
      * Returns the `Float` value stored at [key], or [defaultValue] if no value was stored. If a value of a different
      * type was stored at `key`, the behavior is not defined.
      */
-    public fun getFloat(key: String, defaultValue: Float = 0f): Float
+    public fun getFloat(key: String, defaultValue: Float): Float
 
     /**
      * Returns the `Float` value stored at [key], or `null` if no value was stored. If a value of a different type was
@@ -132,7 +144,7 @@ public interface Settings {
      * Returns the `Double` value stored at [key], or [defaultValue] if no value was stored. If a value of a different
      * type was stored at `key`, the behavior is not defined.
      */
-    public fun getDouble(key: String, defaultValue: Double = 0.0): Double
+    public fun getDouble(key: String, defaultValue: Double): Double
 
     /**
      * Returns the `Double` value stored at [key], or `null` if no value was stored. If a value of a different type was
@@ -149,7 +161,7 @@ public interface Settings {
      * Returns the `Boolean` value stored at [key], or [defaultValue] if no value was stored. If a value of a different
      * type was stored at `key`, the behavior is not defined.
      */
-    public fun getBoolean(key: String, defaultValue: Boolean = false): Boolean
+    public fun getBoolean(key: String, defaultValue: Boolean): Boolean
 
     /**
      * Returns the `Boolean` value stored at [key], or `null` if no value was stored. If a value of a different type was
@@ -161,42 +173,168 @@ public interface Settings {
 /**
  * An extension to the [Settings] interface to include update listener functionality
  */
-@ExperimentalListener
 public interface ObservableSettings : Settings {
-    /**
-     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
-     * reference is returned which should be passed to [removeListener] when you no longer need it so that the
-     * associated platform resources can be cleaned up.
-     *
-     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
-     * garbage-collected on Android.
-     *
-     * No attempt is made in the current implementation to safely handle multithreaded interaction with the listener, so
-     * it's recommended that interaction with the listener APIs be confined to the main UI thread.
-     */
-    @ExperimentalListener
-    public fun addListener(key: String, callback: () -> Unit): SettingsListener
 
     /**
-     * Unsubscribes the [listener] from receiving updates to the value at the key it monitors
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
      */
-    @ExperimentalListener
-    public fun removeListener(listener: SettingsListener)
+    @Suppress("DEPRECATION")
+    public fun addIntListener(
+        key: String,
+        defaultValue: Int,
+        callback: (Int) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addLongListener(
+        key: String,
+        defaultValue: Long,
+        callback: (Long) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addStringListener(
+        key: String,
+        defaultValue: String,
+        callback: (String) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addFloatListener(
+        key: String,
+        defaultValue: Float,
+        callback: (Float) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addDoubleListener(
+        key: String,
+        defaultValue: Double,
+        callback: (Double) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addBooleanListener(
+        key: String,
+        defaultValue: Boolean,
+        callback: (Boolean) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addIntOrNullListener(
+        key: String,
+        callback: (Int?) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addLongOrNullListener(
+        key: String,
+        callback: (Long?) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addStringOrNullListener(
+        key: String,
+        callback: (String?) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addFloatOrNullListener(
+        key: String,
+        callback: (Float?) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addDoubleOrNullListener(
+        key: String,
+        callback: (Double?) -> Unit
+    ): SettingsListener
+
+    /**
+     * Adds a listener which will call the supplied [callback] anytime the value at [key] changes. A [SettingsListener]
+     * reference is returned which can be used to halt callbacks by calling [deactivate()][SettingsListener.deactivate].
+     * A strong reference should be held to the `SettingsListener` returned by this method in order to avoid it being
+     * garbage-collected.
+     */
+    @Suppress("DEPRECATION")
+    public fun addBooleanOrNullListener(
+        key: String,
+        callback: (Boolean?) -> Unit
+    ): SettingsListener
 
 }
 
-@Deprecated(
-    "ListenableSettings has been renamed ObservableSettings",
-    replaceWith = ReplaceWith("ObservableSettings", "com.russhwolf.settings.ObservableSettings"),
-    level = DeprecationLevel.WARNING
-)
-@ExperimentalListener
-@Suppress("UNUSED", "KDocMissingDocumentation")
-public typealias ListenableSettings = ObservableSettings
-
 /**
- * A handle to a listener instance returned by [ObservableSettings.addListener] so it can be passed to
- * [ObservableSettings.removeListener].
+ * A handle to a listener instance returned by one of the addListener methods of [ObservableSettings], so it can be
+ * deactivated as needed.
  */
-@ExperimentalListener
-public interface SettingsListener
+public interface SettingsListener {
+    /**
+     * Unsubscribes this [SettingsListener] from receiving updates to the value at the key it monitors. After calling
+     * this method you should no longer hold a reference to the listener.
+     */
+    public fun deactivate()
+}
